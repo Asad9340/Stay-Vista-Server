@@ -3,7 +3,7 @@ const app = express();
 require('dotenv').config();
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 
 const port =8000;
@@ -83,14 +83,19 @@ async function run() {
 
     // Get all room collection routes
     app.get('/rooms', async (req, res) => {
-      try {
         const result = await roomCollection.find().toArray();
         res.send(result);
-      } catch (error) {
-        res.status(500).send({ message: 'Error retrieving rooms', error });
-      }
     });
 
+    // get single room
+    app.get('/room/:id', async (req, res) => {
+      const roomId = req.params.id;
+      const room = await roomCollection.findOne({ _id: new ObjectId(roomId) });
+      if (!room) {
+        return res.status(404).send('Room not found');
+      }
+      res.send(room);
+    })
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 });
     console.log(
