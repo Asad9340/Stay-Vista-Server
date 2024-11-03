@@ -92,6 +92,13 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/my-listings/:email', async (req, res) => {
+      const email = req.params.email;
+      const query={'host.email': email}
+      const result = await roomCollection.find(query).toArray();
+      res.send(result);
+    })
+
     app.post('/add-room', async (req, res) => {
       const room = req.body;
       const result = await roomCollection.insertOne(room);
