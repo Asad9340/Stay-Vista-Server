@@ -6,7 +6,7 @@ const cookieParser = require('cookie-parser');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 
-const port =8000;
+const port = 8000;
 // Middleware
 const corsOptions = {
   origin: ['http://localhost:5173', 'http://localhost:5174'],
@@ -84,14 +84,19 @@ async function run() {
     // Get all room collection routes
     app.get('/rooms', async (req, res) => {
       const category = req.query.category;
-      let query={}
-      if (category && category!=='null') {
-         query = { category}
+      let query = {};
+      if (category && category !== 'null') {
+        query = { category };
       }
-        const result = await roomCollection.find(query).toArray();
-        res.send(result);
+      const result = await roomCollection.find(query).toArray();
+      res.send(result);
     });
 
+    app.post('/add-room', async (req, res) => {
+      const room = req.body;
+      const result = await roomCollection.insertOne(room);
+      res.send(result);
+    });
     // get single room
     app.get('/room/:id', async (req, res) => {
       const roomId = req.params.id;
@@ -100,7 +105,7 @@ async function run() {
         return res.status(404).send('Room not found');
       }
       res.send(room);
-    })
+    });
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 });
     console.log(
