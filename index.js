@@ -49,6 +49,7 @@ async function run() {
     // Connect to MongoDB
     await client.connect();
     const roomCollection = client.db('stayvista').collection('rooms');
+    const usersCollection = client.db('stayvista').collection('users');
 
     // Auth-related API
     app.post('/jwt', async (req, res) => {
@@ -94,10 +95,10 @@ async function run() {
 
     app.get('/my-listings/:email', async (req, res) => {
       const email = req.params.email;
-      const query={'host.email': email}
+      const query = { 'host.email': email };
       const result = await roomCollection.find(query).toArray();
       res.send(result);
-    })
+    });
 
     app.post('/add-room', async (req, res) => {
       const room = req.body;
@@ -119,8 +120,29 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = roomCollection.deleteOne(query);
       res.send(result);
-
-    })
+    });
+    // add new user
+    app.put('/user', async (req, res) => {
+      const user = req.body;
+      const filter = { email: user?.email };
+      const isExist = await usersCollection.findOne(filter);
+      if (isExist) {
+        return res.send(isExist);
+      }
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          ...user,
+          timestamp: Date.now(),
+        },
+      };
+      const result = await usersCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 });
     console.log(
