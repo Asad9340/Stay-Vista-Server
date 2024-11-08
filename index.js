@@ -121,6 +121,13 @@ async function run() {
       const result = roomCollection.deleteOne(query);
       res.send(result);
     });
+    // get single user
+    app.get('/user/:email', async (req, res) => {
+      const email = req.params.email;
+      const filter = { email };
+      const result = await usersCollection.findOne(filter);
+      res.send(result);
+    });
     // add new user
     app.put('/user', async (req, res) => {
       const user = req.body;
