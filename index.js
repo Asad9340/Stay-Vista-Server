@@ -134,7 +134,14 @@ async function run() {
       const filter = { email: user?.email };
       const isExist = await usersCollection.findOne(filter);
       if (isExist) {
-        return res.send(isExist);
+        if (user.status === 'Requested') {
+          const result = await usersCollection.updateOne(filter, {
+            $set: { status: user.status },
+          });
+          return res.send(result);
+        } else {
+          return res.send(isExist);
+        }
       }
       const options = { upsert: true };
       const updateDoc = {
