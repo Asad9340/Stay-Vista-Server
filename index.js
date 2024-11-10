@@ -128,6 +128,10 @@ async function run() {
       const result = await usersCollection.findOne(filter);
       res.send(result);
     });
+    app.get('/users', async (req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result);
+    });
     // add new user
     app.put('/user', async (req, res) => {
       const user = req.body;
