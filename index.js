@@ -26,7 +26,6 @@ const verifyToken = async (req, res, next) => {
   }
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
-      console.log(err);
       return res.status(401).send({ message: 'Unauthorized access' });
     }
     req.user = decoded;
@@ -51,6 +50,26 @@ async function run() {
     const roomCollection = client.db('stayvista').collection('rooms');
     const usersCollection = client.db('stayvista').collection('users');
 
+    // middleware for admin route
+    const verifyAdmin = async (req, res, next) => {
+      const user = req.user;
+      const filter = { email: user?.email };
+      const result = await usersCollection.findOne(filter);
+      if (!result || result?.role !== 'admin') {
+        return res.status(403).send({ message: 'Unauthorized access' });
+      }
+      next();
+    }
+    // middleware for host route
+    const verifyHost = async (req, res, next) => {
+      const user = req.user;
+      const filter = { email: user?.email };
+      const result = await usersCollection.findOne(filter);
+      if (!result || result?.role !== 'host') {
+        return res.status(403).send({ message: 'Unauthorized access' });
+      }
+      next();
+    }
     // Auth-related API
     app.post('/jwt', async (req, res) => {
       const user = req.body;
@@ -93,14 +112,14 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/my-listings/:email', async (req, res) => {
+    app.get('/my-listings/:email',verifyToken,verifyHost, async (req, res) => {
       const email = req.params.email;
       const query = { 'host.email': email };
       const result = await roomCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.post('/add-room', async (req, res) => {
+    app.post('/add-room',verifyToken, verifyHost, async (req, res) => {
       const room = req.body;
       const result = await roomCollection.insertOne(room);
       res.send(result);
@@ -115,7 +134,7 @@ async function run() {
       res.send(room);
     });
     // delete single room
-    app.delete('/room/:id', async (req, res) => {
+    app.delete('/room/:id',verifyToken,verifyHost, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = roomCollection.deleteOne(query);
@@ -128,7 +147,7 @@ async function run() {
       const result = await usersCollection.findOne(filter);
       res.send(result);
     });
-    app.get('/users', async (req, res) => {
+    app.get('/users',verifyToken,verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
