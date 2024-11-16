@@ -5,6 +5,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const port = 8000;
 // Middleware
@@ -20,7 +21,6 @@ app.use(cookieParser());
 // Verify Token Middleware
 const verifyToken = async (req, res, next) => {
   const token = req.cookies?.token;
-  console.log(token);
   if (!token) {
     return res.status(401).send({ message: 'Unauthorized access' });
   }
@@ -49,7 +49,7 @@ async function run() {
     await client.connect();
     const roomCollection = client.db('stayvista').collection('rooms');
     const usersCollection = client.db('stayvista').collection('users');
-
+    const bookingCollection = client.db('stayvista').collection('bookings');
     // middleware for admin route
     const verifyAdmin = async (req, res, next) => {
       const user = req.user;
@@ -59,7 +59,7 @@ async function run() {
         return res.status(403).send({ message: 'Unauthorized access' });
       }
       next();
-    }
+    };
     // middleware for host route
     const verifyHost = async (req, res, next) => {
       const user = req.user;
@@ -69,7 +69,7 @@ async function run() {
         return res.status(403).send({ message: 'Unauthorized access' });
       }
       next();
-    }
+    };
     // Auth-related API
     app.post('/jwt', async (req, res) => {
       const user = req.body;
@@ -101,6 +101,23 @@ async function run() {
       }
     });
 
+    app.post('/create-payment-intent', verifyToken, async (req, res) => {
+      const price = req.body.price;
+      const priceInCent = parseFloat(price) * 100;
+      if (!price || priceInCent < 1) return;
+      // generate clientSecret
+      const { client_secret } = await stripe.paymentIntents.create({
+        amount: priceInCent,
+        currency: 'usd',
+        // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
+      // send client secret as response
+      res.send({ clientSecret: client_secret });
+    });
+
     // Get all room collection routes
     app.get('/rooms', async (req, res) => {
       const category = req.query.category;
@@ -112,14 +129,19 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/my-listings/:email',verifyToken,verifyHost, async (req, res) => {
-      const email = req.params.email;
-      const query = { 'host.email': email };
-      const result = await roomCollection.find(query).toArray();
-      res.send(result);
-    });
+    app.get(
+      '/my-listings/:email',
+      verifyToken,
+      verifyHost,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { 'host.email': email };
+        const result = await roomCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
 
-    app.post('/add-room',verifyToken, verifyHost, async (req, res) => {
+    app.post('/add-room', verifyToken, verifyHost, async (req, res) => {
       const room = req.body;
       const result = await roomCollection.insertOne(room);
       res.send(result);
@@ -134,7 +156,7 @@ async function run() {
       res.send(room);
     });
     // delete single room
-    app.delete('/room/:id',verifyToken,verifyHost, async (req, res) => {
+    app.delete('/room/:id', verifyToken, verifyHost, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = roomCollection.deleteOne(query);
@@ -147,7 +169,7 @@ async function run() {
       const result = await usersCollection.findOne(filter);
       res.send(result);
     });
-    app.get('/users',verifyToken,verifyAdmin, async (req, res) => {
+    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
@@ -194,6 +216,31 @@ async function run() {
         },
       };
       const result = await usersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    // booking collection route
+    app.post('/booking', verifyToken, async (req, res) => {
+      const booking = req.body;
+      const result = await bookingCollection.insertOne(booking);
+      res.send(result);
+    });
+    app.get('/booking/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { 'guest.email': email };
+      const result = await bookingCollection.find(query).toArray();
+      res.send(result);
+    })
+    app.patch('/room/status/:id', verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const status = req.body.status;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          booked: status,
+        },
+      };
+      const result = await roomCollection.updateOne(query, updateDoc);
       res.send(result);
     });
     // Send a ping to confirm a successful connection
