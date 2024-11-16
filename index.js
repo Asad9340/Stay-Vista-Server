@@ -225,12 +225,18 @@ async function run() {
       const result = await bookingCollection.insertOne(booking);
       res.send(result);
     });
+    app.delete('/booking/cancel/:id', verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { roomId: id };
+      const result = bookingCollection.deleteOne(query);
+      res.send(result);
+    });
     app.get('/booking/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { 'guest.email': email };
       const result = await bookingCollection.find(query).toArray();
       res.send(result);
-    })
+    });
     app.patch('/room/status/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const status = req.body.status;
