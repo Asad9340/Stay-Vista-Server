@@ -146,6 +146,17 @@ async function run() {
       const result = await roomCollection.insertOne(room);
       res.send(result);
     });
+
+    app.put('/room/update/:id', verifyToken, verifyHost, async (req, res) => {
+      const id = req.params.id;
+      const roomData = req.body;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: roomData,
+      };
+      const result = await roomCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
     // get single room
     app.get('/room/:id', async (req, res) => {
       const roomId = req.params.id;
@@ -237,12 +248,17 @@ async function run() {
       const result = await bookingCollection.find(query).toArray();
       res.send(result);
     });
-    app.get('/manage-booking/:email', verifyToken,verifyHost, async (req, res) => {
-      const email = req.params.email;
-      const query = { 'host.email': email };
-      const result = await bookingCollection.find(query).toArray();
-      res.send(result);
-    });
+    app.get(
+      '/manage-booking/:email',
+      verifyToken,
+      verifyHost,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { 'host.email': email };
+        const result = await bookingCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
     app.patch('/room/status/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const status = req.body.status;
@@ -258,7 +274,7 @@ async function run() {
 
     // statistics data route starts here
     app.get('/admin-stat', verifyToken, verifyAdmin, async (req, res) => {
-      const bookingDetails = await bookingsCollection
+      const bookingDetails = await bookingCollection
         .find(
           {},
           {
@@ -271,7 +287,7 @@ async function run() {
         .toArray();
 
       const totalUsers = await usersCollection.countDocuments();
-      const totalRooms = await roomsCollection.countDocuments();
+      const totalRooms = await roomCollection.countDocuments();
       const totalPrice = bookingDetails.reduce(
         (sum, booking) => sum + booking.price,
         0
@@ -300,7 +316,7 @@ async function run() {
     // Host Statistics
     app.get('/host-stat', verifyToken, verifyHost, async (req, res) => {
       const { email } = req.user;
-      const bookingDetails = await bookingsCollection
+      const bookingDetails = await bookingCollection
         .find(
           { 'host.email': email },
           {
@@ -312,7 +328,7 @@ async function run() {
         )
         .toArray();
 
-      const totalRooms = await roomsCollection.countDocuments({
+      const totalRooms = await roomCollection.countDocuments({
         'host.email': email,
       });
       const totalPrice = bookingDetails.reduce(
@@ -348,7 +364,7 @@ async function run() {
     // Guest Statistics
     app.get('/guest-stat', verifyToken, async (req, res) => {
       const { email } = req.user;
-      const bookingDetails = await bookingsCollection
+      const bookingDetails = await bookingCollection
         .find(
           { 'guest.email': email },
           {
@@ -388,9 +404,6 @@ async function run() {
         guestSince: timestamp,
       });
     });
-
-
-
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 });
