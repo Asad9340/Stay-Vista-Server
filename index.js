@@ -6,18 +6,60 @@ const cookieParser = require('cookie-parser');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
+const nodemailer = require('nodemailer');
 const port = 8000;
 // Middleware
 const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'https://stay-vista-a5a22.web.app',
+    'https://stay-vista-a5a22.firebaseapp.com',
+    'https://stay-vista9340.web.app',
+  ],
   credentials: true,
   optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
+// send email
+const sendEmail = (emailAddress, emailData) => {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // Use `true` for port 465, `false` for all other ports
+    auth: {
+      user: process.env.TRANSPORTER_EMAIL,
+      pass: process.env.TRANSPORTER_PASS,
+    },
+  });
 
+  // verify transporter
+  // verify connection configuration
+  transporter.verify(function (error, success) {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log('Server is ready to take our messages');
+    }
+  });
+  const mailBody = {
+    from: `"StayVista" <${process.env.TRANSPORTER_EMAIL}>`, // sender address
+    to: emailAddress, // list of receivers
+    subject: emailData.subject, // Subject line
+    html: emailData.message, // html body
+  };
+
+  transporter.sendMail(mailBody, (error, info) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log('Email Sent: ' + info.response);
+    }
+  });
+};
 // Verify Token Middleware
 const verifyToken = async (req, res, next) => {
   const token = req.cookies?.token;
@@ -211,6 +253,26 @@ async function run() {
         updateDoc,
         options
       );
+      sendEmail(user?.email, {
+        subject: 'Welcome to Stayvista!',
+        message: `
+  <div style="text-align: center; padding: 1.5rem; background-color: #F9FAFB; border-radius: 0.5rem; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+  <p style="background-color:#DDDEE3;padding:20px 20px 10 20px">
+    <img src="https://i.postimg.cc/13rFBgXg/logo-removebg-preview-1.png" alt="Stay Vista Logo" style="width: 200px; margin-bottom: 1rem;">
+    </p>
+    <h1 style="font-size: 1.5rem; font-weight: bold; color: #1B1F3B; margin-bottom: 0.75rem;">
+      Welcome to Stay Vista!
+    </h1>
+    <p style="font-size: 1rem; color: #4B5563; margin-bottom: 1.25rem;">
+      Your journey to a perfect stay starts here.
+    </p>
+    <a href="/explore"
+       style="display: inline-block; background-color: #E11D48; color: #FFFFFF; font-weight: 600; padding: 0.5rem 1rem; border-radius: 0.375rem; text-decoration: none; transition: background-color 0.3s;">
+      Discover Now
+    </a>
+  </div>
+`,
+      });
       res.send(result);
     });
 
@@ -234,6 +296,24 @@ async function run() {
     app.post('/booking', verifyToken, async (req, res) => {
       const booking = req.body;
       const result = await bookingCollection.insertOne(booking);
+      // send email to guest
+      sendEmail(bookingData?.guest?.email, {
+        subject: 'Booking Successful!',
+        message: `<p>Thank you for booking with Stay Vista! Your reservation is confirmed. Transaction ID: ${bookingData.transactionId}. We look forward to hosting you!
+        </p>
+        <p style="background-color:#DDDEE3;padding:20px 20px 10 20px">
+        <img src="https://i.postimg.cc/13rFBgXg/logo-removebg-preview-1.png" alt="Stay Vista Logo" style="width: 200px; margin-bottom: 1rem;">
+        </p>`,
+      });
+      // send email to host
+      sendEmail(bookingData?.host?.email, {
+        subject: 'Your room got booked!',
+        message: `<p> You're all set to welcome ${bookingData.guest.name}! Thank you for partnering with Stay Vista.
+        </p>
+        <p style="background-color:#DDDEE3;padding:20px 20px 10 20px">
+        <img src="https://i.postimg.cc/13rFBgXg/logo-removebg-preview-1.png" alt="Stay Vista Logo" style="width: 200px; margin-bottom: 1rem;">
+        </p>,`,
+      });
       res.send(result);
     });
     app.delete('/booking/cancel/:id', verifyToken, async (req, res) => {
