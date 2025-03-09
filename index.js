@@ -85,7 +85,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect to MongoDB
-    await client.connect();
+    // await client.connect();
     const roomCollection = client.db('stayvista').collection('rooms');
     const usersCollection = client.db('stayvista').collection('users');
     const bookingCollection = client.db('stayvista').collection('bookings');
@@ -232,6 +232,11 @@ async function run() {
         if (user.status === 'Requested') {
           const result = await usersCollection.updateOne(filter, {
             $set: { status: user.status },
+          });
+          return res.send(result);
+        } else if (user.phoneNumber) {
+          const result = await usersCollection.updateOne(filter, {
+            $set: { phoneNumber: user.phoneNumber },
           });
           return res.send(result);
         } else {
@@ -476,7 +481,7 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db('admin').command({ ping: 1 });
+    // await client.db('admin').command({ ping: 1 });
     console.log(
       'Pinged your deployment. You successfully connected to MongoDB!'
     );
