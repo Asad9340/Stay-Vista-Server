@@ -223,6 +223,24 @@ async function run() {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+
+    app.get('/search', async (req, res) => {
+      const queryText = req.query;
+      let query = {};
+
+      if (queryText.query) {
+        query = {
+          $or: [
+            { title: { $regex: queryText.query, $options: 'i' } },
+            { location: { $regex: queryText.query, $options: 'i' } },
+          ],
+        };
+      }
+
+      const result = await roomCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // add new user
     app.put('/user', async (req, res) => {
       const user = req.body;
