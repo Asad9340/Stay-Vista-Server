@@ -89,6 +89,7 @@ async function run() {
     const roomCollection = client.db('stayvista').collection('rooms');
     const usersCollection = client.db('stayvista').collection('users');
     const bookingCollection = client.db('stayvista').collection('bookings');
+    const reviewsCollection = client.db('stayvista').collection('reviews');
     // middleware for admin route
     const verifyAdmin = async (req, res, next) => {
       const user = req.user;
@@ -496,6 +497,101 @@ async function run() {
         chartData,
         guestSince: timestamp,
       });
+    });
+    app.post('/review', verifyToken, async (req, res) => {
+      try {
+        const {
+          id: roomId,
+          review,
+          rating,
+          userEmail,
+          userName,
+          photoURL,
+        } = req.body;
+
+        if (!roomId || !review || !rating || !userEmail) {
+          return res.status(400).send({ message: 'Missing required fields' });
+        }
+
+        // Verify the user has booked the room
+        const booking = await bookingCollection.findOne({
+          roomId,
+          'guest.email': userEmail,
+        });
+
+        if (!booking) {
+          return res
+            .status(403)
+            .send({ message: 'You have not booked this room' });
+        }
+
+        // Check if the user already reviewed this room
+        const existingReview = await reviewsCollection.findOne({
+          roomId,
+          'user.email': userEmail,
+        });
+
+        if (existingReview) {
+          return res
+            .status(409)
+            .send({ message: 'You have already reviewed this room' });
+        }
+
+        // Insert the review
+        const result = await reviewsCollection.insertOne({
+          roomId,
+          review,
+          rating,
+          user: {
+            email: userEmail,
+            name: userName,
+            photo: photoURL,
+          },
+          date: new Date(),
+        });
+
+        return res.status(200).send({
+          message: 'Review submitted successfully',
+          insertedId: result.insertedId,
+        });
+      } catch (err) {
+        console.error('Error submitting review:', err);
+        return res.status(500).send({ message: 'Server error' });
+      }
+    });
+    app.get('/review/:roomId', async (req, res) => {
+      const { roomId } = req.params;
+
+      if (!roomId) {
+        return res.status(400).send({ message: 'Room ID is required' });
+      }
+
+      try {
+        const reviews = await reviewsCollection
+          .find({ roomId })
+          .sort({ date: -1 }) // newest first
+          .toArray();
+
+        res.status(200).send(reviews);
+      } catch (err) {
+        console.error('Error fetching room reviews:', err);
+        res.status(500).send({ message: 'Server error' });
+      }
+    });
+    app.get('/review', async (req, res) => {
+      try {
+        const reviews = await reviewsCollection
+          .find({})
+          .sort({ date: -1 }) // newest reviews first
+          .toArray();
+
+        res.status(200).send(reviews);
+      } catch (err) {
+        console.error('Error fetching all reviews:', err);
+        res
+          .status(500)
+          .send({ message: 'Server error while fetching reviews' });
+      }
     });
 
     // Send a ping to confirm a successful connection
